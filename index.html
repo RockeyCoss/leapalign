@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>LeapAlign: Post-Training Flow Matching Models at Any Generation Step by Building Two-Step Trajectories</title>
+    <meta name="description" content="Project page for LeapAlign: Post-Training Flow Matching Models at Any Generation Step by Building Two-Step Trajectories.">
+    <meta name="citation_title" content="LeapAlign: Post-Training Flow Matching Models at Any Generation Step by Building Two-Step Trajectories">
+    <meta name="citation_author" content="Liang, Zhanhao">
+    <meta name="citation_author" content="Yang, Tao">
+    <meta name="citation_author" content="Wu, Jie">
+    <meta name="citation_author" content="Feng, Chengjian">
+    <meta name="citation_author" content="Zheng, Liang">
+    <meta name="citation_publication_date" content="2026/04/15">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+    <link rel="stylesheet" href="static/css/styles.css?v=banner-tldr-26">
+    <script>
+      window.MathJax = {
+        loader: { load: ["[tex]/color"] },
+        tex: {
+          inlineMath: [["\\(", "\\)"]],
+          displayMath: [["\\[", "\\]"]],
+          packages: { "[+]": ["color"] }
+        }
+      };
+    </script>
+    <script defer id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    <script defer src="static/js/fontawesome.all.min.js"></script>
+  </head>
+  <body>
+    <nav class="toc-container" aria-label="Table of contents">
+      <h4>Contents</h4>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#method">Method</a></li>
+        <li><a href="#experiments">Experimental Results</a></li>
+        <li><a href="#conclusion">Conclusion</a></li>
+        <li><a href="#bibtex">BibTeX</a></li>
+        <li><a href="#references">References</a></li>
+      </ul>
+    </nav>
+
+    <main class="page-shell">
+      <section class="paper-header" aria-labelledby="paper-title">
+        <div class="title-section">
+          <h1 id="paper-title">
+            LeapAlign: Post-Training Flow Matching Models<br>
+            at Any Generation Step by Building Two-Step Trajectories
+          </h1>
+        </div>
+
+        <div class="authors" aria-label="Paper authors">
+          <a href="https://github.com/RockeyCoss" target="_blank" rel="noopener">Zhanhao Liang</a><sup>1,2,*</sup>
+          <span class="author-separator"></span>
+          <a href="https://github.com/ThomasMrY" target="_blank" rel="noopener">Tao Yang</a><sup>2,*,&dagger;</sup>
+          <span class="author-separator"></span>
+          <a href="https://wujie1010.github.io/" target="_blank" rel="noopener">Jie Wu</a><sup>2</sup>
+          <span class="author-separator"></span>
+          <a href="https://fcjian.github.io/" target="_blank" rel="noopener">Chengjian Feng</a><sup>2</sup>
+          <span class="author-separator"></span>
+          <a href="https://zheng-lab-anu.github.io/" target="_blank" rel="noopener">Liang Zheng</a><sup>1</sup>
+
+          <div class="affiliations">
+            <sup>1</sup>The Australian National University
+            <span class="affiliation-separator"></span>
+            <sup>2</sup>ByteDance Seed
+          </div>
+
+          <div class="author-note">
+            <sup>*</sup>Equal contribution
+            <span class="note-separator"></span>
+            <sup>&dagger;</sup>Project lead
+          </div>
+        </div>
+
+        <div class="button-row">
+          <a class="button paper-link" href="https://arxiv.org/abs/2604.15311" target="_blank" rel="noopener">
+            <span class="icon is-small"><i class="ai ai-arxiv"></i></span> arXiv
+          </a>
+          <a class="button">
+            <span class="icon is-small"><i class="fab fa-github"></i></span> Code (Under Review)
+          </a>
+          <a class="button">
+            <span class="icon is-small"><img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="HF" style="height: 1em;"></span> Models (Under Review)
+          </a>
+        </div>
+      </section>
+
+      <section class="tldr-section standalone-tldr" aria-label="TL;DR">
+        <p>
+          <span class="tldr-label">TL;DR:</span>
+          LeapAlign constructs a two-step leap trajectory from a full generation trajectory for efficient reward gradient backpropagation. It enables fine-tuning at any generation step without incurring excessive memory cost or gradient explosion. LeapAlign shows strong performance in aligning flow matching models with general human preferences and improving image-text alignment.
+        </p>
+      </section>
+
+      <section class="teaser-section" aria-label="Image teaser">
+        <figure class="teaser-figure">
+          <div class="teaser-marquee">
+            <div class="teaser-track">
+              <div class="teaser-sequence">
+                <img
+                  src="assets/teaser-tile-1-512.webp"
+                  srcset="assets/teaser-tile-1-512.webp 512w, assets/teaser-tile-1.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="Generated image example from LeapAlign fine-tuned Flux">
+                <img
+                  src="assets/teaser-tile-2-512.webp"
+                  srcset="assets/teaser-tile-2-512.webp 512w, assets/teaser-tile-2.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="Generated image example from LeapAlign fine-tuned Flux">
+                <img
+                  src="assets/teaser-tile-3-512.webp"
+                  srcset="assets/teaser-tile-3-512.webp 512w, assets/teaser-tile-3.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="Generated image example from LeapAlign fine-tuned Flux">
+                <img
+                  src="assets/teaser-tile-4-512.webp"
+                  srcset="assets/teaser-tile-4-512.webp 512w, assets/teaser-tile-4.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="Generated image example from LeapAlign fine-tuned Flux">
+                <img
+                  src="assets/teaser-tile-5-512.webp"
+                  srcset="assets/teaser-tile-5-512.webp 512w, assets/teaser-tile-5.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="Generated image example from LeapAlign fine-tuned Flux">
+              </div>
+              <div class="teaser-sequence" aria-hidden="true">
+                <img
+                  src="assets/teaser-tile-1-512.webp"
+                  srcset="assets/teaser-tile-1-512.webp 512w, assets/teaser-tile-1.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="">
+                <img
+                  src="assets/teaser-tile-2-512.webp"
+                  srcset="assets/teaser-tile-2-512.webp 512w, assets/teaser-tile-2.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="">
+                <img
+                  src="assets/teaser-tile-3-512.webp"
+                  srcset="assets/teaser-tile-3-512.webp 512w, assets/teaser-tile-3.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="">
+                <img
+                  src="assets/teaser-tile-4-512.webp"
+                  srcset="assets/teaser-tile-4-512.webp 512w, assets/teaser-tile-4.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="">
+                <img
+                  src="assets/teaser-tile-5-512.webp"
+                  srcset="assets/teaser-tile-5-512.webp 512w, assets/teaser-tile-5.webp 1024w"
+                  sizes="(max-width: 430px) 180px, (max-width: 680px) 42vw, 240px"
+                  width="1024"
+                  height="1024"
+                  decoding="async"
+                  alt="">
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            Images generated by Flux fine-tuned with LeapAlign using HPSv3 as the reward model. More examples appear in the gallery below.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="overview" class="content-section overview-section">
+        <h2>Overview</h2>
+
+        <p>
+          Text-to-image flow matching models can be fine-tuned by directly backpropagating reward gradients through differentiable sampling trajectories. However, full-trajectory backpropagation is memory-intensive and prone to gradient explosion. Existing methods either update only late generation steps<sup class="citation"><a href="#ref-imagereward">[1]</a>, <a href="#ref-draft">[2]</a></sup>, missing early steps that control image layout, or stop gradients at the model input, discarding gradient terms that reflect interaction between steps<sup class="citation"><a href="#ref-drtune">[3]</a></sup>.
+        </p>
+
+        <p>
+          LeapAlign constructs a two-step leap trajectory from a full trajectory and backpropagates reward gradients through this shortened path. This enables updates at any generation step, while gradient discounting retains gradient terms that reflect interaction between steps and stabilizes training.
+        </p>
+
+        <p class="contribution-intro">
+          Our contributions are as follows:
+        </p>
+
+        <ul class="contribution-list">
+          <li>
+            We propose LeapAlign, which trains on a two-step leap trajectory carved from a full run. This reduces memory cost and allows model updates at any generation step.
+          </li>
+          <li>
+            We further propose two techniques for improvement. We assign leap trajectories higher weights if they are similar to the real path. We also scale down gradient terms that potentially have a large magnitude instead of completely removing them, preserving their usefulness.
+          </li>
+          <li>
+            LeapAlign stably fine-tunes Flux and consistently outperforms existing post-training methods in improving image generation quality and image-text alignment.
+          </li>
+        </ul>
+      </section>
+
+      <section id="method" class="content-section method-section">
+        <h2>Method</h2>
+
+        <figure class="method-figure">
+          <img
+            src="assets/method.webp?v=method-2"
+            srcset="assets/method-1600.webp?v=method-2 1600w, assets/method.webp?v=method-2 2800w"
+            sizes="(max-width: 680px) 100vw, 960px"
+            width="2800"
+            height="949"
+            loading="lazy"
+            decoding="async"
+            alt="Overview of the LeapAlign method">
+          <figcaption>
+            <strong>Overview of LeapAlign.</strong> Reward gradients are backpropagated through a two-step leap trajectory instead of the full generation trajectory.
+          </figcaption>
+        </figure>
+
+        <div class="method-copy">
+          <h3>Leap Trajectory Construction</h3>
+          <p>
+            We randomly select two timesteps \(k\) and \(j\) from the generation trajectory, where \(k &gt; j\). We then construct the leap trajectory as:
+          </p>
+
+          <div class="latex-display" aria-label="Leap trajectory construction equations">
+            \[
+            \begin{aligned}
+            \hat{x}_{j \mid k} &= x_k - (k-j)v_\theta(x_k),
+            && \color{#4f71be}{\text{One-Step Leap Prediction}} \\
+            x_j &= \hat{x}_{j \mid k} + \operatorname{stop\_gradient}(x_j-\hat{x}_{j \mid k}),
+            && \color{#e18341}{\text{Latent Connector}} \\
+            \hat{x}_{0 \mid j} &= x_j - jv_\theta(x_j),
+            && \color{#4f71be}{\text{One-Step Leap Prediction}} \\
+            x_0 &= \hat{x}_{0 \mid j} + \operatorname{stop\_gradient}(x_0-\hat{x}_{0 \mid j}),
+            && \color{#e18341}{\text{Latent Connector}}
+            \end{aligned}
+            \]
+          </div>
+
+          <p>
+            This process forms a two-step leap trajectory:
+          </p>
+
+          <div class="latex-display trajectory-display" aria-label="Two-step leap trajectory">
+            \[
+            x_k
+            \;{\color{#4f71be}{\rightarrow}}\;
+            (\hat{x}_{j \mid k} \;{\color{#e18341}{\dashrightarrow}}\; x_j)
+            \;{\color{#4f71be}{\rightarrow}}\;
+            (\hat{x}_{0 \mid j} \;{\color{#e18341}{\dashrightarrow}}\; x_0)
+            \]
+          </div>
+
+          <p>
+            The <span class="one-step-color">solid blue arrows</span> denote one-step leap predictions by the flow matching model, while the <span class="latent-connector-color">dashed orange arrows</span> denote latent connectors that align predicted latents with real latents. Reward gradients are <span class="gradient-color">backpropagated through the leap trajectory</span> instead of the full generation trajectory. Because \(k\) and \(j\) are randomly selected, LeapAlign can fine-tune any generation step.
+          </p>
+
+          <h3>Gradient Discounting</h3>
+          <p>
+            Backpropagating through the leap trajectory gives the following gradient:
+          </p>
+
+          <div class="latex-display" aria-label="Gradient through the leap trajectory">
+            \[
+            \begin{aligned}
+            \frac{\partial x_0}{\partial \theta}
+            &=
+            \underbrace{
+            -\,j\frac{\partial v_\theta(x_j)}{\partial \theta}
+            - (k-j)\frac{\partial v_\theta(x_k)}{\partial \theta}
+            }_{\text{single-step gradients at } k \text{ and } j}
+            \\
+            &\quad+
+            \underbrace{
+            j(k-j)\frac{\partial v_\theta(x_j)}{\partial x_j}
+            \frac{\partial v_\theta(x_k)}{\partial \theta}
+            }_{\text{nested gradient}}.
+            \end{aligned}
+            \]
+          </div>
+
+          <p>
+            The nested gradient is useful for capturing interactions across different generation steps, but it can have a large magnitude. To control it, we introduce gradient discounting. With a discounting factor \(\alpha \in [0, 1]\), we modify the second one-step leap prediction:
+          </p>
+
+          <div class="latex-display" aria-label="Discounted one-step leap prediction">
+            \[
+            \hat{x}_{0 \mid j}
+            =
+            x_j - jv_\theta\!\left(\alpha x_j + (1-\alpha)\operatorname{stop\_gradient}(x_j)\right).
+            \]
+          </div>
+
+          <p>
+            The gradient then becomes:
+          </p>
+
+          <div class="latex-display" aria-label="Discounted gradient through the leap trajectory">
+            \[
+            \begin{aligned}
+            \frac{\partial x_0}{\partial \theta}
+            &=
+            -\,j\frac{\partial v_\theta(x_j)}{\partial \theta}
+            - (k-j)\frac{\partial v_\theta(x_k)}{\partial \theta}
+            \\
+            &\quad+
+            {\color{#d62728}{\alpha}}j(k-j)\frac{\partial v_\theta(x_j)}{\partial x_j}
+            \frac{\partial v_\theta(x_k)}{\partial \theta}.
+            \end{aligned}
+            \]
+          </div>
+
+          <p>
+            By adjusting \(\alpha\), we can moderate the gradient magnitude without discarding any component of the gradient flow. This, together with the leap trajectory design, stabilizes optimization while retaining full learning signals.
+          </p>
+
+          <h3>Fine-Tuning Objective</h3>
+          <p>
+            To reduce reward hacking and prevent unstable optimization toward excessively high or misleading reward values, we use a simple hinge-style objective:
+          </p>
+
+          <div class="latex-display" aria-label="Fine-tuning objective">
+            \[
+            \mathcal{L}_{\text{raw}} = \max(0, \lambda - r(x_0)).
+            \]
+          </div>
+
+          <p>
+            We evaluate the reward using the generated image \(x_0\), which directly reflects the output quality of the full generation trajectory. This allows the reward model to make more faithful assessments of visual and semantic quality, providing reliable supervision signals for fine-tuning.
+          </p>
+
+          <h3>Trajectory-Similarity Weighting</h3>
+          <p>
+            To emphasize leap trajectories that better match the original generation dynamics and provide reliable training signals, we introduce trajectory-similarity weighting. We measure similarity by the average absolute difference between predicted states \(\hat{x}\) and actual states \(x\) at the two connection points:
+          </p>
+
+          <div class="latex-display" aria-label="Trajectory similarity distances">
+            \[
+            d_j = \operatorname{mean}\!\left(|x_j-\hat{x}_{j \mid k}|\right),
+            \qquad
+            d_0 = \operatorname{mean}\!\left(|x_0-\hat{x}_{0 \mid j}|\right).
+            \]
+          </div>
+
+          <p>
+            To avoid overemphasizing near-identical pairs, we clamp each distance with a minimum value \(\tau\) and define the weighting factor as:
+          </p>
+
+          <div class="latex-display" aria-label="Trajectory similarity weighting factor">
+            \[
+            w_{\text{sim}} =
+            \frac{1}{\max(d_j, \tau) + \max(d_0, \tau)}.
+            \]
+          </div>
+
+          <p>
+            The final objective is formulated as:
+          </p>
+
+          <div class="latex-display" aria-label="Final fine-tuning objective">
+            \[
+            \mathcal{L} = \operatorname{stop\_gradient}(w_{\text{sim}})\,\mathcal{L}_{\text{raw}}.
+            \]
+          </div>
+        </div>
+      </section>
+
+      <section id="experiments" class="content-section experiments-section">
+        <h2>Experimental Results</h2>
+
+        <div class="results-copy">
+          <h3>General Preference Alignment</h3>
+          <p class="table-caption-text">
+            General preference alignment on Flux with HPSv2.1 as reward.
+            <span class="mixgrpo-note"><sup>†</sup> MixGRPO is fine-tuned using HPSv2.1, PickScore, and ImageReward as reward models for general preference alignment experiments.</span>
+          </p>
+        </div>
+
+        <div class="table-wrap compact-table-wrap">
+          <table class="results-table" aria-label="General preference alignment on Flux with HPSv2.1 as reward">
+            <colgroup>
+              <col class="method-col">
+              <col class="score-col">
+              <col class="score-col">
+              <col class="score-col">
+              <col class="wide-score-col">
+              <col class="quality-col">
+              <col class="image-reward-col">
+            </colgroup>
+            <thead>
+              <tr>
+                <th rowspan="2" class="method-head">Method</th>
+                <th colspan="1" class="domain-head in-domain-head">In-Domain</th>
+                <th colspan="5" class="domain-head out-domain-head">Out-of-Domain</th>
+              </tr>
+              <tr>
+                <th class="metric-in-domain">
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">HPSv2.1</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th class="metric-out-domain-start">
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">HPSv3</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">PickScore</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">
+                      <span>UnifiedReward</span>
+                      <span>Alignment</span>
+                    </span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">
+                      <span>UnifiedReward</span>
+                      <span>Image-Quality</span>
+                    </span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">ImageReward</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="table-group">
+                <td colspan="7">Pretrained Model</td>
+              </tr>
+              <tr>
+                <th scope="row">Flux</th>
+                <td class="metric-in-domain">0.3078</td>
+                <td class="metric-out-domain-start">13.5020</td>
+                <td>22.7902</td>
+                <td>3.4514</td>
+                <td>3.5708</td>
+                <td>1.0455</td>
+              </tr>
+              <tr class="table-group">
+                <td colspan="7">Policy-Gradient-Based Methods</td>
+              </tr>
+              <tr>
+                <th scope="row">DanceGRPO</th>
+                <td class="metric-in-domain">0.3451</td>
+                <td class="metric-out-domain-start">14.8336</td>
+                <td>23.1186</td>
+                <td>3.4660</td>
+                <td>3.6199</td>
+                <td>1.2347</td>
+              </tr>
+              <tr>
+                <th scope="row">MixGRPO<sup>†</sup></th>
+                <td class="metric-in-domain">0.3692</td>
+                <td class="metric-out-domain-start">14.7530</td>
+                <td>23.5184</td>
+                <td>3.4393</td>
+                <td>3.6241</td>
+                <td><strong>1.6155</strong></td>
+              </tr>
+              <tr class="table-group">
+                <td colspan="7">Direct-Gradient Methods</td>
+              </tr>
+              <tr>
+                <th scope="row">ReFL</th>
+                <td class="metric-in-domain">0.3852</td>
+                <td class="metric-out-domain-start">15.5127</td>
+                <td>23.6299</td>
+                <td>3.4786</td>
+                <td>3.6870</td>
+                <td>1.3468</td>
+              </tr>
+              <tr>
+                <th scope="row">DRaFT-LV</th>
+                <td class="metric-in-domain">0.3859</td>
+                <td class="metric-out-domain-start">15.3699</td>
+                <td><u>23.6437</u></td>
+                <td><u>3.4868</u></td>
+                <td><u>3.6887</u></td>
+                <td>1.3384</td>
+              </tr>
+              <tr>
+                <th scope="row">DRTune</th>
+                <td class="metric-in-domain"><u>0.3882</u></td>
+                <td class="metric-out-domain-start"><u>15.5606</u></td>
+                <td>23.5185</td>
+                <td>3.4793</td>
+                <td>3.6679</td>
+                <td>1.3562</td>
+              </tr>
+              <tr class="ours-row">
+                <th scope="row">LeapAlign</th>
+                <td class="metric-in-domain"><strong>0.4092</strong></td>
+                <td class="metric-out-domain-start"><strong>15.7678</strong></td>
+                <td><strong>23.7137</strong></td>
+                <td><strong>3.4984</strong></td>
+                <td><strong>3.7244</strong></td>
+                <td><u>1.5104</u></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          LeapAlign achieves the best scores on HPSv2.1, HPSv3, PickScore, UnifiedReward-Alignment, and UnifiedReward-Image-Quality. Although MixGRPO jointly uses three reward models, LeapAlign is trained only with HPSv2.1 and still obtains higher HPSv2.1 and PickScore scores while remaining competitive on ImageReward. Overall, LeapAlign delivers consistent in-domain and out-of-domain gains in human preference alignment, image-text consistency, and image quality.
+        </p>
+
+        <div class="results-copy subsection-copy">
+          <h3>Compositional Alignment</h3>
+          <p class="table-caption-text">
+            Compositional alignment on the GenEval benchmark with Flux as the base model and HPSv2.1 as the reward.
+          </p>
+        </div>
+
+        <div class="table-wrap geneval-table-wrap">
+          <table class="results-table geneval-table" aria-label="Compositional alignment on the GenEval benchmark">
+            <colgroup>
+              <col class="method-col">
+              <col class="geneval-overall-col">
+              <col class="geneval-medium-col">
+              <col class="geneval-medium-col">
+              <col class="geneval-small-col">
+              <col class="geneval-small-col">
+              <col class="geneval-small-col">
+              <col class="geneval-wide-col">
+            </colgroup>
+            <thead>
+              <tr>
+                <th rowspan="2" class="method-head">Method</th>
+                <th colspan="7" class="domain-head">GenEval Benchmark</th>
+              </tr>
+              <tr>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">Overall</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">
+                      <span>Single</span>
+                      <span>Object</span>
+                    </span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">
+                      <span>Two</span>
+                      <span>Objects</span>
+                    </span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">Counting</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">Colors</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">Position</span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="metric-with-arrow">
+                    <span class="metric-label">
+                      <span>Attribute</span>
+                      <span>Binding</span>
+                    </span>
+                    <span class="metric-arrow">↑</span>
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="table-group">
+                <td colspan="8">Pretrained Model</td>
+              </tr>
+              <tr>
+                <th scope="row">Flux</th>
+                <td>0.6535</td>
+                <td><u>99.38</u></td>
+                <td>86.62</td>
+                <td>66.88</td>
+                <td>74.47</td>
+                <td>19.50</td>
+                <td>45.25</td>
+              </tr>
+              <tr class="table-group">
+                <td colspan="8">Policy-Gradient-Based Methods</td>
+              </tr>
+              <tr>
+                <th scope="row">DanceGRPO</th>
+                <td>0.6775</td>
+                <td><u>99.38</u></td>
+                <td>90.15</td>
+                <td>69.38</td>
+                <td>76.33</td>
+                <td>22.25</td>
+                <td>49.00</td>
+              </tr>
+              <tr>
+                <th scope="row">MixGRPO</th>
+                <td><u>0.7232</u></td>
+                <td><strong>99.69</strong></td>
+                <td><u>93.69</u></td>
+                <td><strong>80.00</strong></td>
+                <td><u>80.05</u></td>
+                <td>24.25</td>
+                <td>56.25</td>
+              </tr>
+              <tr class="table-group">
+                <td colspan="8">Direct-Gradient Methods</td>
+              </tr>
+              <tr>
+                <th scope="row">ReFL</th>
+                <td>0.7011</td>
+                <td><u>99.38</u></td>
+                <td>92.68</td>
+                <td>69.06</td>
+                <td>75.80</td>
+                <td>26.75</td>
+                <td><u>57.00</u></td>
+              </tr>
+              <tr>
+                <th scope="row">DRaFT-LV</th>
+                <td>0.7024</td>
+                <td><strong>99.69</strong></td>
+                <td>92.42</td>
+                <td><u>74.06</u></td>
+                <td>75.53</td>
+                <td>24.00</td>
+                <td>55.75</td>
+              </tr>
+              <tr>
+                <th scope="row">DRTune</th>
+                <td>0.7101</td>
+                <td><u>99.38</u></td>
+                <td><u>93.69</u></td>
+                <td>73.12</td>
+                <td>76.86</td>
+                <td><u>27.50</u></td>
+                <td>55.50</td>
+              </tr>
+              <tr class="ours-row">
+                <th scope="row">LeapAlign</th>
+                <td><strong>0.7420</strong></td>
+                <td><u>99.38</u></td>
+                <td><strong>96.46</strong></td>
+                <td>72.50</td>
+                <td><strong>80.59</strong></td>
+                <td><strong>30.25</strong></td>
+                <td><strong>66.00</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          LeapAlign achieves the highest overall GenEval score, 0.7420, compared with 0.7232 for MixGRPO, the strongest policy-gradient-based baseline, and 0.7101 for DRTune, the strongest direct-gradient baseline. It shows strong performance under the &lsquo;two objects&rsquo;, &lsquo;colors&rsquo;, &lsquo;position&rsquo;, and &lsquo;attribute binding&rsquo; categories. Since MixGRPO can use policy gradients to update early steps, and DRTune can also fine-tune early steps but discards critical gradients, these results indicate the benefit of fine-tuning early steps and the effectiveness of LeapAlign.
+        </p>
+
+        <div class="plot-row">
+          <figure class="result-figure">
+            <img
+              src="assets/hpsv2_geneval_leapalign_vs_drtune.png"
+              width="1559"
+              height="1162"
+              loading="lazy"
+              decoding="async"
+              alt="Reward improvement during fine-tuning on the compositional alignment task">
+            <figcaption>
+              Comparison of reward improvement during fine-tuning on the compositional alignment task.
+            </figcaption>
+          </figure>
+          <figure class="result-figure">
+            <img
+              src="assets/geneval_improvement.png"
+              width="1515"
+              height="1295"
+              loading="lazy"
+              decoding="async"
+              alt="GenEval score improvement during fine-tuning">
+            <figcaption>
+              Comparison of GenEval score improvement during fine-tuning among ReFL, DRaFT-LV, DRTune, and <strong>LeapAlign</strong>.
+            </figcaption>
+          </figure>
+        </div>
+
+        <figure class="qualitative-figure">
+          <img
+            src="assets/geneval_qualitative.webp"
+            srcset="assets/geneval_qualitative-1200.webp 1200w, assets/geneval_qualitative.webp 2200w"
+            sizes="(max-width: 680px) 100vw, 850px"
+            width="2200"
+            height="1395"
+            loading="lazy"
+            decoding="async"
+            alt="Qualitative comparison on the GenEval benchmark">
+          <figcaption>
+            Qualitative comparison on the GenEval benchmark.
+          </figcaption>
+        </figure>
+
+        <div class="results-copy subsection-copy">
+          <h3>Image Gallery</h3>
+        </div>
+
+        <figure class="hpsv3-gallery-figure">
+          <img
+            src="assets/hpsv3_gallery.webp"
+            srcset="assets/hpsv3_gallery-1600.webp 1600w, assets/hpsv3_gallery.webp 2800w"
+            sizes="(max-width: 680px) 100vw, 920px"
+            width="2800"
+            height="4205"
+            loading="lazy"
+            decoding="async"
+            alt="Qualitative results of Flux fine-tuned with LeapAlign using HPSv3 as the reward model">
+          <figcaption>
+            Images generated by Flux fine-tuned with LeapAlign using HPSv3 as the reward model.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="conclusion" class="content-section conclusion-section">
+        <h2>Conclusion</h2>
+
+        <p>
+          This paper introduces LeapAlign, a new post-training method that constructs two-step leap trajectories for efficient and stable reward gradient backpropagation. We find it useful to down-scale the large-magnitude gradient term and up-weight leap trajectories that are more similar to the original trajectories. LeapAlign addresses the challenge of propagating reward gradients to early generation steps without incurring excessive memory cost or sacrificing useful gradient terms. This is reflected by consistent improvements over existing post-training methods across a wide range of metrics, including general image preference and image-text alignment.
+        </p>
+      </section>
+
+      <section id="bibtex" class="content-section bibtex-section">
+        <h2>BibTeX</h2>
+
+        <div class="bibtex-box">
+          <button class="copy-button" type="button" data-copy-target="bibtex-code" aria-label="Copy BibTeX to clipboard">Copy</button>
+          <pre><code id="bibtex-code">@misc{liang2026leapalign,
+      title={LeapAlign: Post-Training Flow Matching Models at Any Generation Step by Building Two-Step Trajectories}, 
+      author={Zhanhao Liang and Tao Yang and Jie Wu and Chengjian Feng and Liang Zheng},
+      year={2026},
+      eprint={2604.15311},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2604.15311}, 
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="references" class="content-section references-section">
+        <h2>References</h2>
+
+        <p id="ref-imagereward">
+          [1] Xu, Jiazheng, et al. "ImageReward: Learning and evaluating human preferences for text-to-image generation." <em>Advances in Neural Information Processing Systems</em> 36 (2023): 15903-15935.
+        </p>
+
+        <p id="ref-draft">
+          [2] Clark, Kevin, et al. "Directly fine-tuning diffusion models on differentiable rewards." <em>arXiv preprint arXiv:2309.17400</em> (2023).
+        </p>
+
+        <p id="ref-drtune">
+          [3] Wu, Xiaoshi, et al. "Deep reward supervisions for tuning text-to-image diffusion models." <em>European Conference on Computer Vision</em>. Cham: Springer Nature Switzerland, 2024.
+        </p>
+      </section>
+    </main>
+    <script>
+      document.querySelectorAll("[data-copy-target]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.getElementById(button.dataset.copyTarget);
+          if (!target) {
+            return;
+          }
+
+          const text = target.textContent.trim();
+          try {
+            if (navigator.clipboard && window.isSecureContext) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              const textarea = document.createElement("textarea");
+              textarea.value = text;
+              textarea.setAttribute("readonly", "");
+              textarea.style.position = "fixed";
+              textarea.style.opacity = "0";
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand("copy");
+              textarea.remove();
+            }
+
+            const previousText = button.textContent;
+            button.textContent = "Copied";
+            window.setTimeout(() => {
+              button.textContent = previousText;
+            }, 1600);
+          } catch (error) {
+            button.textContent = "Copy failed";
+            window.setTimeout(() => {
+              button.textContent = "Copy";
+            }, 1800);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
